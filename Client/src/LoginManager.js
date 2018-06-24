@@ -5,8 +5,10 @@ class LoginManager extends React.Component {
   constructor(props) {
     super(props);
     this.renderCode = this.renderCode.bind(this);
+    this.renderDb = this.renderDb.bind(this);
     this.state = {
       code: '5217',
+      dbinfo: 'Place holder',
     };
   }
   
@@ -34,10 +36,29 @@ class LoginManager extends React.Component {
     )
   }
   
+  renderDb() {
+    let db = this.state.dbinfo;
+    
+    return (
+      <p>
+      {db}
+      <button type="submit" onClick={() => this.handleGetDbInfo()}>Update Db Info</button>
+      </p>
+    )
+  }
+  
   handleGetCode() {
     fetch("http://localhost:8000/api").then(r => r.text()).then(code => {
       this.setState({
         code: code
+      });
+    });
+  }
+  
+  handleGetDbInfo() {
+    fetch("http://localhost:8000/db").then(r => r.text()).then(query => {
+      this.setState({
+        dbinfo: query
       });
     });
   }
@@ -50,14 +71,15 @@ class LoginManager extends React.Component {
       inputBox = <this.renderInputBox />
     );
     
-    let code;
-    code = <this.renderCode />
+    let code = <this.renderCode />;
+    let db = <this.renderDb />;
     
     return (
       <div className="Center">
         {inputBox}
         <button type="submit" onClick={() => this.props.onClick()}>Log in</button>
         {code}
+        {db}
       </div>
     )
   }

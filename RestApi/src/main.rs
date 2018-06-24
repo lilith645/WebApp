@@ -1,30 +1,37 @@
 #![feature(plugin, custom_derive)]
 #![plugin(rocket_codegen)]
 
+extern crate rand;
 extern crate rocket;
 extern crate rocket_cors;
+extern crate rusqlite;
 
+#[macro_use] extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
 
-use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors};
+mod message;
+mod database;
+use database::DbConn;
 
+use rand::{thread_rng, Rng};
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::io;
 
-use rocket::{Response, State};
-
+use rocket::http::RawStr;
 use rocket::http::Method;
-
+use rocket::request::Form;
+use rocket::{Response, State};
 use rocket::response::content;
+use rocket::http::ContentType;
+use rocket::response::NamedFile;
 use rocket::response::Responder;
 use rocket::response::content::Content;
-use rocket::http::ContentType;
 
-use std::path::PathBuf;
-use std::io;
-use rocket::request::Form;
-use rocket::http::RawStr;
-use rocket::response::NamedFile;
-use rocket::response::content::Json;
+use rocket_contrib::{Json, Value as JsonValue};
+
+use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors};
 
 #[get("/hello/<name>/<age>/<cool>")]
 fn cool(name: String, age: u8, cool: bool) -> String {
@@ -40,12 +47,6 @@ fn hello(name: &RawStr) -> String {
   format!("Hello, {}!", name.as_str())
 }
 
-#[get("/world")]
-fn world() -> &'static str {
-  "Hello world!"
-}
-
-
 #[derive(FromForm)]
 struct UserLogin<'r> {
   username: &'r RawStr,
@@ -59,28 +60,35 @@ fn login<'a>(user_form: Form<'a, UserLogin<'a>>) -> String {
   format!("Thanks for logging in {}", user.username.as_str())
 }
 
-/*
-#[derive(Serialize)]
-struct TemplateContext {
-    name: String,
-    items: Vec<String>
-}
 
-#[get("/hello/<name>")]
-fn get(name: String) -> Template {
-    let context = TemplateContext {
-        name: name,
-        items: vec!["One", "Two", "Three"].iter().map(|s| s.to_string()).collect()
-    };
-
-    Template::render("index", &context)
-}*/
 
 #[get("/api")]
 fn borrowed(options: State<Cors>) -> impl Responder {
-    options
-        .inner()
-        .respond_borrowed(|guard| guard.responder("8749"))
+  let mut rng: rand::ThreadRng = thread_rng();
+  let code = ((rng.gen::<f32>()*(8999.0)).floor() as i32 + 1000);
+  let temp = code.to_string().clone();
+  
+  options
+      .inner()
+      .respond_borrowed(|guard| guard.responder(temp))
+}
+
+#[get("/db")]
+fn db_test<'a, 'b>(options: State<'a, Cors>, db_conn: State<'b, DbConn>) -> impl Responder<'a> {
+  let response: String = db_conn.lock()
+    .expect("db connect lock")
+    .query_row("SELECT name FROM entries WHERE id = 0", &[], |row| { row.get(0) }).unwrap();
+  
+  options.inner()
+    .respond_borrowed(|guard| guard.responder(response))
+}
+
+#[error(404)]
+fn not_found() -> Json<JsonValue> {
+    Json(json!({
+        "status": "error",
+        "reason": "Resource was not found."
+    }))
 }
 
 fn cors_options() -> Cors {
@@ -98,9 +106,15 @@ fn cors_options() -> Cors {
 }
 
 fn main() {
+  let conn = database::open_db_in_memory();
+  
+  database::init_database(&conn);
+  
   rocket::ignite()
-  .mount("/", routes![borrowed],)
+  .mount("/", routes![borrowed, db_test],)
   .mount("/", rocket_cors::catch_all_options_routes())
+  .catch(errors![not_found])
+  .manage(Mutex::new(conn))
   .manage(cors_options())
   .launch();
 }
