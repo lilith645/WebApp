@@ -6,21 +6,26 @@ class LoginManager extends React.Component {
     super(props);
     this.renderCode = this.renderCode.bind(this);
     this.renderDb = this.renderDb.bind(this);
+    this.renderLoginBox = this.renderLoginBox.bind(this);
+    this.handleUsernameChange = this.handleUsernameChange.bind(this);
+    this.handlePasswordChange = this.handlePasswordChange.bind(this);
+    this.handleLoginClick = this.handleLoginClick.bind(this);
     this.state = {
+      loggedin: false,
       code: '5217',
       dbinfo: 'Place holder',
+      username: '',
+      email: 'Test@email.com',
+      password: ''
     };
   }
   
-  renderInputBox() {
+  renderLoginBox() {
     return (
       <p>
-      Username <input type="text" name="username" placeholder="Username..."></input>
-      <br></br>
-      <br></br>
-      Password <input type="text" name="password" placeholder="Password..."></input>
-      <br></br>
-      <br></br>
+        Username: <input id= "username" type="text" name="username" placeholder="Username..." value={this.state.username} onChange={this.handleUsernameChange}></input><br></br>
+        Password: <input id="password" type="password" name="password" placeholder="Password..." value={this.state.password} onChange={this.handlePasswordChange}></input><br></br>
+      <button type="submit" onClick={this.handleLoginClick}>Log in</button>
       </p>
     )
   }
@@ -47,6 +52,18 @@ class LoginManager extends React.Component {
     )
   }
   
+  handleUsernameChange(e) {
+    this.setState({
+      username: e.target.value
+    });
+  }
+  
+  handlePasswordChange(e) {
+    this.setState({
+      password: e.target.value
+    });
+  }
+  
   handleGetCode() {
     fetch("http://localhost:8000/api").then(r => r.text()).then(code => {
       this.setState({
@@ -63,12 +80,42 @@ class LoginManager extends React.Component {
     });
   }
   
+  handleLoginClick() {
+    var data = new FormData();
+    data.append("user", JSON.stringify({ username: this.state.username, email: this.state.email, password: this.state.password}));
+    
+    fetch("http://localhost:8000/users", {
+      method: "POST",
+      mode: 'no-cors',
+      headers: {
+        'Accept': 'application/json, text/plain, */*',
+        'Content-Type': 'application/json'
+      },
+      body: data
+/*      headers: {
+        'Accept': 'application/json',
+        'Content-Type':'application/json'
+      },
+       body: JSON.stringify({"user": {
+          "username" : this.state.username,
+          "email"    : "temp@email.com",
+          "password" : this.state.password,
+        }
+       })*/
+    }).then(data => data)
+    .then(data => console.log(data));
+    
+    this.setState({
+      isLoggedIn: true,
+    })
+  }
+  
   render(props) {
-    let inputBox;
+    let loginBox;
     this.props.isLoggedIn ? (
-      inputBox = "Already logged in"
+      loginBox = "Already logged in"
     ) : (
-      inputBox = <this.renderInputBox />
+      loginBox = <this.renderLoginBox />
     );
     
     let code = <this.renderCode />;
@@ -76,8 +123,7 @@ class LoginManager extends React.Component {
     
     return (
       <div className="Center">
-        {inputBox}
-        <button type="submit" onClick={() => this.props.onClick()}>Log in</button>
+        {loginBox}
         {code}
         {db}
       </div>

@@ -12,6 +12,8 @@ serde_json = "1.0"
 rocket_cors = "*"
 rand = "*"
 rusqlite = "0.13"
+validator = "0.6.3"
+validator_derive = "0.6.1"
 
 [dependencies.rocket_contrib]
 rocket_contrib = "*"

@@ -6,11 +6,19 @@ extern crate rocket;
 extern crate rocket_cors;
 extern crate rusqlite;
 
+extern crate serde;
+extern crate serde_json;
+
+extern crate validator;
+
+#[macro_use] extern crate validator_derive;
 #[macro_use] extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
 
 mod message;
 mod database;
+mod profiles;
+
 use database::DbConn;
 
 use rand::{thread_rng, Rng};
@@ -32,35 +40,6 @@ use rocket::response::content::Content;
 use rocket_contrib::{Json, Value as JsonValue};
 
 use rocket_cors::{AllowedHeaders, AllowedOrigins, Cors};
-
-#[get("/hello/<name>/<age>/<cool>")]
-fn cool(name: String, age: u8, cool: bool) -> String {
-  if cool {
-    format!("You are a cool {} year old, {}!", age, name)
-  } else {
-    format!("{}, we need to talk about your coolness", name)
-  }
-}
-
-#[get("/hello/<name>")]
-fn hello(name: &RawStr) -> String {
-  format!("Hello, {}!", name.as_str())
-}
-
-#[derive(FromForm)]
-struct UserLogin<'r> {
-  username: &'r RawStr,
-  password: &'r RawStr,
-}
-
-#[post("/login", data = "<user_form>")]
-fn login<'a>(user_form: Form<'a, UserLogin<'a>>) -> String {
-  let user = user_form.get();
-  
-  format!("Thanks for logging in {}", user.username.as_str())
-}
-
-
 
 #[get("/api")]
 fn borrowed(options: State<Cors>) -> impl Responder {
@@ -98,7 +77,7 @@ fn cors_options() -> Cors {
     // You can also deserialize this
     rocket_cors::Cors {
         allowed_origins: allowed_origins,
-        allowed_methods: vec![Method::Get].into_iter().map(From::from).collect(),
+        allowed_methods: vec![Method::Get, Method::Post].into_iter().map(From::from).collect(),
         allowed_headers: AllowedHeaders::some(&["Authorization", "Accept"]),
         allow_credentials: true,
         ..Default::default()
@@ -111,7 +90,7 @@ fn main() {
   database::init_database(&conn);
   
   rocket::ignite()
-  .mount("/", routes![borrowed, db_test],)
+  .mount("/", routes![borrowed, db_test, profiles::post_users],)
   .mount("/", rocket_cors::catch_all_options_routes())
   .catch(errors![not_found])
   .manage(Mutex::new(conn))
